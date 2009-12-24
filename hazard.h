@@ -50,42 +50,6 @@ static void (*hazard_free_func) (gpointer p);
 
 #define TAS(p) g_atomic_int_compare_and_exchange(p,FALSE,TRUE)
 
-#if 0
-static HList*
-h_list_push(HList    *list,
-            gpointer  data)
-{
-	HList *node;
-
-	node = g_malloc(sizeof(HList));
-	node->next = list;
-	node->data = data;
-
-	return node;
-}
-
-static HList*
-h_list_pop(HList    *list,
-           gpointer *data)
-{
-	HList *node, *result;
-
-	g_assert(data);
-
-	if (!list) {
-		*data = NULL;
-		return NULL;
-	}
-
-	node = list;
-	result = list->next;
-	*data = node->data;
-	g_free(node);
-
-	return result;
-}
-#endif
-
 static void
 hazard_acquire(void)
 {
