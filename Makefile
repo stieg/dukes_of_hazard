@@ -23,4 +23,4 @@ asyncqueue-test: asyncqueue-test.c
 		`pkg-config --cflags --libs $(PKGS)`
 
 clean:
-	rm -rf queue-test hlist-test
+	rm -rf queue-test asyncqueue-test
