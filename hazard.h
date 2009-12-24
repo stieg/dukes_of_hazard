@@ -72,6 +72,7 @@ hazard_acquire(void)
 }
 
 /*
+// This should be called when a thread dies/leaves.
 static void
 hazard_release(void)
 {
