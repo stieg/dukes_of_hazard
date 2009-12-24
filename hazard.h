@@ -91,13 +91,10 @@ hazard_compare(gconstpointer a,
 	return (a == b) ? 0 : a - b;
 }
 
-#if 1
-static gpointer
+static inline gpointer
 g_slist_pop(GSList   *list,
             gpointer *data)
 {
-	g_assert(data);
-
 	if (!list) {
 		*data = NULL;
 		return NULL;
@@ -106,7 +103,6 @@ g_slist_pop(GSList   *list,
 	*data = list->data;
 	return g_slist_delete_link(list, list);
 }
-#endif
 
 static void
 hazard_free(gpointer data)
