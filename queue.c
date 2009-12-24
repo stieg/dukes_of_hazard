@@ -83,12 +83,12 @@ queue_enqueue(Queue         *q,
 	l->next = NULL;
 
 	while (TRUE) {
-		t = VolatileGet(&q->tail);
+		t = q->tail;
 		HAZARD_SET(0, t);
-		if (VolatileGet(&q->tail) != t)
+		if (q->tail != t)
 			continue;
 		next = t->next;
-		if (VolatileGet(&q->tail) != t)
+		if (q->tail != t)
 			continue;
 		if (next != NULL) {
 			CompareAndSwap(&q->tail, t, next);
@@ -110,14 +110,14 @@ queue_dequeue(Queue *q)
 	g_return_val_if_fail(q != NULL, NULL);
 
 	while (TRUE) {
-		h = VolatileGet(&q->head);
+		h = q->head;
 		HAZARD_SET(0, h);
-		if (VolatileGet(&q->head) != h)
+		if (q->head != h)
 			continue;
-		t = VolatileGet(&q->tail);
+		t = q->tail;
 		next = h->next;
 		HAZARD_SET(1, next);
-		if (VolatileGet(&q->head) != h)
+		if (q->head != h)
 			continue;
 		if (next == NULL)
 			return NULL;
