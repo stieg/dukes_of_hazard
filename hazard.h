@@ -134,7 +134,7 @@ hazard_scan(Hazard *head)
 	hazard = head;
 	while (hazard != NULL) {
 		for (i = 0; i < (HAZARD_K - 1); i++) {
-			hptr = g_atomic_pointer_get(&hazard->hp[i]);
+			hptr = &hazard->hp[i];
 			if (hptr != NULL) {
 				g_tree_insert(plist, hptr, hptr);
 			}
