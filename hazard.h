@@ -27,7 +27,6 @@
 } G_STMT_END
 
 typedef struct _Hazard Hazard;
-typedef struct _HList HList;
 
 struct _Hazard {
 	gpointer  hp[HAZARD_K];
@@ -35,11 +34,6 @@ struct _Hazard {
 	gboolean  active;
 	GSList   *rlist;
 	gint      rcount;
-};
-
-struct _HList {
-	gpointer  data;
-	HList    *next;
 };
 
 __thread Hazard *myhazard = NULL;
