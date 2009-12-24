@@ -34,6 +34,7 @@ struct _Hazard {
 	gboolean  active;
 	GSList   *rlist;
 	gint      rcount;
+	GTree    *plist;
 };
 
 __thread Hazard *myhazard = NULL;
@@ -43,6 +44,13 @@ static   gint    H = 0;
 static void (*hazard_free_func) (gpointer p);
 
 #define TAS(p) g_atomic_int_compare_and_exchange(p,FALSE,TRUE)
+
+static inline gint
+hazard_compare(gconstpointer a,
+               gconstpointer b)
+{
+	return (a == b) ? 0 : a - b;
+}
 
 static void
 hazard_acquire(void)
@@ -62,6 +70,7 @@ hazard_acquire(void)
 	oldcount = g_atomic_int_exchange_and_add(&H, HAZARD_K);
 	hazard = g_slice_new0(Hazard);
 	hazard->active = TRUE;
+	hazard->plist = g_tree_new(hazard_compare);
 
 	do {
 		oldhead = hazards;
@@ -84,13 +93,6 @@ hazard_release(void)
 	myhazard->active = FALSE;
 }
 */
-
-static inline gint
-hazard_compare(gconstpointer a,
-               gconstpointer b)
-{
-	return (a == b) ? 0 : a - b;
-}
 
 static inline gpointer
 g_slist_pop(GSList   *list,
@@ -115,19 +117,17 @@ static void
 hazard_scan(Hazard *head)
 {
 	Hazard *hazard;
-	GTree *plist;
 	gpointer hptr = NULL;
 	gint i;
 	GSList *tmplist;
 
 	/* Stage 1 */
-	plist = g_tree_new(hazard_compare);
 	hazard = head;
 	while (hazard != NULL) {
 		for (i = 0; i < (HAZARD_K - 1); i++) {
 			hptr = &hazard->hp[i];
 			if (hptr != NULL) {
-				g_tree_insert(plist, hptr, hptr);
+				g_tree_insert(myhazard->plist, hptr, hptr);
 			}
 		}
 		hazard = hazard->next;
@@ -139,7 +139,7 @@ hazard_scan(Hazard *head)
 	myhazard->rlist = NULL;
 	tmplist = g_slist_pop(tmplist, &hptr);
 	while (hptr != NULL) {
-		if (g_tree_lookup(plist, hptr)) {
+		if (g_tree_lookup(myhazard->plist, hptr)) {
 			myhazard->rlist = g_slist_prepend(myhazard->rlist, hptr);
 			myhazard->rcount++;
 		} else {
@@ -147,7 +147,12 @@ hazard_scan(Hazard *head)
 		}
 		tmplist = g_slist_pop(tmplist, &hptr);
 	}
-	g_tree_unref(plist);
+	/* There is no way to call g_tree_remove_all() directly, so we
+	 * call g_tree_destroy() which will do it for us.  Destroy will
+	 * also unref the GTree so we increment our ref count first.
+	 */
+	myhazard->plist = g_tree_ref(myhazard->plist);
+	g_tree_destroy(myhazard->plist);
 }
 
 static void
