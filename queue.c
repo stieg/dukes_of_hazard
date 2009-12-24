@@ -5,7 +5,6 @@
 
 #define CompareAndSwap(p,o,n) \
 	(g_atomic_pointer_compare_and_exchange((gpointer*)(p),(o),(n)))
-#define VolatileGet(p) (g_atomic_pointer_get((p)))
 
 typedef struct _Link Link;
 
