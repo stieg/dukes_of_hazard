@@ -47,30 +47,36 @@ G_BEGIN_DECLS
 #define LF_HAZARD_R (8)
 #endif
 
+#define LF_HAZARD_INIT LfHazard *myhazard = (g_static_private_get(&_lf_myhazard))
+#define LF_HAZARD_TLS (myhazard)
+
 #define LF_HAZARD_SET(i,p) G_STMT_START {                            \
-	if (!_lf_myhazard)                                               \
+	if (!myhazard) {                                                 \
 		lf_hazard_thread_acquire();                                  \
-	_lf_myhazard->hp[(i)] = (p);                                     \
+		myhazard = g_static_private_get(&_lf_myhazard);              \
+		g_assert(myhazard);                                          \
+	}                                                                \
+	myhazard->hp[(i)] = (p);                                         \
 } G_STMT_END
 
 #define LF_HAZARD_UNSET(p) G_STMT_START {                            \
 	LfHazard *_head;                                                 \
-	_lf_myhazard->rlist = g_slist_prepend(_lf_myhazard->rlist, (p)); \
-	_lf_myhazard->rcount++;                                          \
+	myhazard->rlist = g_slist_prepend(myhazard->rlist, (p));         \
+	myhazard->rcount++;                                              \
 	_head = _lf_hazards;                                             \
-	if (_lf_myhazard->rcount >= (_LF_H + LF_HAZARD_R)) {             \
+	if (myhazard->rcount >= (_LF_H + LF_HAZARD_R)) {                 \
 		lf_hazard_scan(_head);                                       \
 		lf_hazard_help_scan();                                       \
 	}                                                                \
 } G_STMT_END
 
-#define G_SLIST_POP(l,d) G_STMT_START {         \
-	if (!(l)) {                                 \
-		*(d) = NULL;                            \
-	} else {                                    \
-		*(d) = (l)->data;                       \
-		(l) = g_slist_delete_link((l), (l));    \
-	}                                           \
+#define G_SLIST_POP(l,d) G_STMT_START {                             \
+	if (!(l)) {                                                     \
+		*(d) = NULL;                                                \
+	} else {                                                        \
+		*(d) = (l)->data;                                           \
+		(l) = g_slist_delete_link((l), (l));                        \
+	}                                                               \
 } G_STMT_END
 
 typedef struct _LfHazard LfHazard;
@@ -87,7 +93,7 @@ struct _LfHazard {
 /*
  * Thread local hazard pointers.
  */
-__thread LfHazard *_lf_myhazard = NULL;
+static GStaticPrivate _lf_myhazard = G_STATIC_PRIVATE_INIT;
 
 /*
  * Global linked-list of all hazard pointers.
@@ -138,7 +144,7 @@ lf_hazard_thread_acquire(void)
 			continue;
 		if (!g_atomic_int_compare_and_exchange(&hazard->active, FALSE, TRUE))
 			continue;
-		_lf_myhazard = hazard;
+		g_static_private_set(&_lf_myhazard, hazard, NULL);
 		return;
 	}
 
@@ -155,7 +161,7 @@ lf_hazard_thread_acquire(void)
 		hazard->next = old_head;
 	} while (!g_atomic_pointer_compare_and_exchange((gpointer *)&_lf_hazards,
 	                                                old_head, hazard));
-	_lf_myhazard = hazard;
+	g_static_private_set(&_lf_myhazard, hazard, NULL);
 }
 
 /*
@@ -171,8 +177,8 @@ lf_hazard_thread_release(void)
 	gint i;
 
 	for (i = 0; i < (LF_HAZARD_K - 1); i++) /* Clear any lingering hazards */
-		_lf_myhazard->hp[i] = NULL;
-	_lf_myhazard->active = FALSE;           /* Notify structure is avaialble */
+		myhazard->hp[i] = NULL;
+	myhazard->active = FALSE;           /* Notify structure is avaialble */
 }
 #endif
 
@@ -192,6 +198,8 @@ lf_hazard_scan(LfHazard *head)
 	gpointer data = NULL;
 	gint i;
 
+	LF_HAZARD_INIT;
+
 	/*
 	 * Stage 1: Collect all the current hazard pointers from active threads.
 	 */
@@ -200,7 +208,7 @@ lf_hazard_scan(LfHazard *head)
 		for (i = 0; i < (LF_HAZARD_K - 1); i++) {
 			data = g_atomic_pointer_get(&hazard->hp[i]);
 			if (data != NULL)
-				g_tree_insert(_lf_myhazard->plist, data, data);
+				g_tree_insert(LF_HAZARD_TLS->plist, data, data);
 		}
 		hazard = hazard->next;
 	}
@@ -208,14 +216,14 @@ lf_hazard_scan(LfHazard *head)
 	/*
 	 * Stage 2: Reclaim expired hazard pointers.
 	 */
-	_lf_myhazard->rcount = 0;
-	tmplist = _lf_myhazard->rlist;
-	_lf_myhazard->rlist = NULL;
+	LF_HAZARD_TLS->rcount = 0;
+	tmplist = LF_HAZARD_TLS->rlist;
+	LF_HAZARD_TLS->rlist = NULL;
 	G_SLIST_POP(tmplist, &data);
 	while (data != NULL) {
-		if (g_tree_lookup(_lf_myhazard->plist, data)) {
-			_lf_myhazard->rlist = g_slist_prepend(_lf_myhazard->rlist, data);
-			_lf_myhazard->rcount++;
+		if (g_tree_lookup(LF_HAZARD_TLS->plist, data)) {
+			LF_HAZARD_TLS->rlist = g_slist_prepend(LF_HAZARD_TLS->rlist, data);
+			LF_HAZARD_TLS->rcount++;
 		} else {
 			lf_hazard_free(data);
 		}
@@ -229,8 +237,8 @@ lf_hazard_scan(LfHazard *head)
 	 * decrements the reference count in the process.  Therefore, we increment
 	 * it before-hand.
 	 */
-	_lf_myhazard->plist = g_tree_ref(_lf_myhazard->plist);
-	g_tree_destroy(_lf_myhazard->plist);
+	LF_HAZARD_TLS->plist = g_tree_ref(LF_HAZARD_TLS->plist);
+	g_tree_destroy(LF_HAZARD_TLS->plist);
 }
 
 static void
@@ -238,6 +246,8 @@ lf_hazard_help_scan(void)
 {
 	LfHazard *hazard, *head;
 	gpointer data;
+
+	LF_HAZARD_INIT;
 
 	for (hazard = _lf_hazards; hazard; hazard = hazard->next) {
 		if (hazard->active)
@@ -247,10 +257,10 @@ lf_hazard_help_scan(void)
 		while (hazard->rcount > 0) {
 			G_SLIST_POP(hazard->rlist, &data);
 			hazard->rcount--;
-			_lf_myhazard->rlist = g_slist_prepend(_lf_myhazard->rlist, data);
-			_lf_myhazard->rcount++;
+			LF_HAZARD_TLS->rlist = g_slist_prepend(LF_HAZARD_TLS->rlist, data);
+			LF_HAZARD_TLS->rcount++;
 			head = _lf_hazards;
-			if (_lf_myhazard->rcount >= (_LF_H + LF_HAZARD_R))
+			if (LF_HAZARD_TLS->rcount >= (_LF_H + LF_HAZARD_R))
 				lf_hazard_scan(head);
 		}
 		hazard->active = FALSE;

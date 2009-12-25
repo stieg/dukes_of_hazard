@@ -160,6 +160,7 @@ lf_queue_enqueue(LfQueue       *queue,
                  gconstpointer  data)
 {
 	LfNode *node, *tail, *next;
+	LF_HAZARD_INIT;
 
 	g_return_if_fail(queue != NULL);
 	g_return_if_fail(data != NULL);
@@ -219,6 +220,7 @@ lf_queue_dequeue(LfQueue *queue)
 {
 	LfNode *head, *tail, *next;
 	gpointer data;
+	LF_HAZARD_INIT;
 
 	g_return_val_if_fail(queue != NULL, NULL);
 

@@ -22,13 +22,35 @@
  */
 
 #include <glib.h>
-#include "lf-queue.h"
 
 #ifdef __linux__
 #include <sys/sysinfo.h>
 #else
-#error "Building on platforms other than Linux is not yet supported."
+#ifdef __APPLE__
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#else
+#error "Building on platforms other than Linux or OSX is not yet supported."
+#endif /* __APPLE__ */
+#endif /* __linux__ */
+
+#include "lf-queue.h"
+
+static gint
+get_num_cpu(void)
+{
+#ifdef __linux__
+	return get_nprocs();
 #endif
+
+#ifdef __APPLE__
+	gint i = 0;
+	size_t s = sizeof(i);
+	if (sysctlbyname("hw.ncpu", &i, &s, NULL, 0))
+		return 1;
+	return i;
+#endif
+}
 
 static void
 test_LfQueue_basic(void)
@@ -83,7 +105,7 @@ test_LfQueue_threaded_alternate_enq_deq_thread_func(gpointer data)
 static void
 test_LfQueue_threaded_alternate_enq_deq(void)
 {
-	gint n_threads = get_nprocs() * 2;
+	gint n_threads = get_num_cpu() * 2;
 	LfQueue *q;
 	GThread **threads;
 	gint i;
