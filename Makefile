@@ -1,6 +1,6 @@
-all: queue-test asyncqueue-test
+all: lf-tests
 
-PKGS = glib-2.0 gthread-2.0
+PKGS = glib-2.0 gthread-2.0 gobject-2.0
 
 WARNINGS =								\
 	-Wall -Werror -Wold-style-definition				\
@@ -12,15 +12,12 @@ WARNINGS =								\
 	-Wmissing-format-attribute -Wnested-externs			\
 	$(NULL)
 
-QUEUE_SOURCES = queue-test.c queue.c queue.h hazard.h
+lf_tests_SOURCES = main.c lf-queue.c
+lf_tests_HEADERS = lf-queue.h lf-hazard.h
 
-queue-test: $(QUEUE_SOURCES)
-	$(CC) -o $@ -g $(WARNINGS) $(QUEUE_SOURCES) \
-		`pkg-config --cflags --libs $(PKGS)`
-
-asyncqueue-test: asyncqueue-test.c
-	$(CC) -o $@ -g $(WARNINGS) asyncqueue-test.c \
+lf-tests: $(lf_tests_SOURCES) $(lf_tests_HEADERS)
+	$(CC) -o $@ -g $(WARNINGS) $(lf_tests_SOURCES) \
 		`pkg-config --cflags --libs $(PKGS)`
 
 clean:
-	rm -rf queue-test asyncqueue-test
+	rm -rf lf-tests
