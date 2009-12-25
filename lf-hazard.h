@@ -51,32 +51,32 @@ G_BEGIN_DECLS
 #define LF_HAZARD_TLS (myhazard)
 
 #define LF_HAZARD_SET(i,p) G_STMT_START {                            \
-	if (!myhazard) {                                                 \
-		lf_hazard_thread_acquire();                                  \
-		myhazard = g_static_private_get(&_lf_myhazard);              \
-		g_assert(myhazard);                                          \
-	}                                                                \
-	myhazard->hp[(i)] = (p);                                         \
+    if (!myhazard) {                                                 \
+        lf_hazard_thread_acquire();                                  \
+        myhazard = g_static_private_get(&_lf_myhazard);              \
+        g_assert(myhazard);                                          \
+    }                                                                \
+    myhazard->hp[(i)] = (p);                                         \
 } G_STMT_END
 
 #define LF_HAZARD_UNSET(p) G_STMT_START {                            \
-	LfHazard *_head;                                                 \
-	myhazard->rlist = g_slist_prepend(myhazard->rlist, (p));         \
-	myhazard->rcount++;                                              \
-	_head = _lf_hazards;                                             \
-	if (myhazard->rcount >= (_LF_H + LF_HAZARD_R)) {                 \
-		lf_hazard_scan(_head);                                       \
-		lf_hazard_help_scan();                                       \
-	}                                                                \
+    LfHazard *_head;                                                 \
+    myhazard->rlist = g_slist_prepend(myhazard->rlist, (p));         \
+    myhazard->rcount++;                                              \
+    _head = _lf_hazards;                                             \
+    if (myhazard->rcount >= (_LF_H + LF_HAZARD_R)) {                 \
+        lf_hazard_scan(_head);                                       \
+        lf_hazard_help_scan();                                       \
+    }                                                                \
 } G_STMT_END
 
-#define G_SLIST_POP(l,d) G_STMT_START {                             \
-	if (!(l)) {                                                     \
-		*(d) = NULL;                                                \
-	} else {                                                        \
-		*(d) = (l)->data;                                           \
-		(l) = g_slist_delete_link((l), (l));                        \
-	}                                                               \
+#define G_SLIST_POP(l,d) G_STMT_START {                              \
+    if (!(l)) {                                                      \
+        *(d) = NULL;                                                 \
+    } else {                                                         \
+        *(d) = (l)->data;                                            \
+        (l) = g_slist_delete_link((l), (l));                         \
+    }                                                                \
 } G_STMT_END
 
 typedef struct _LfHazard LfHazard;
