@@ -59,6 +59,8 @@ G_BEGIN_DECLS
     myhazard->hp[(i)] = (p);                                         \
 } G_STMT_END
 
+
+// XXX: What the hell is happening with the first if statment.
 #define LF_HAZARD_UNSET(p) G_STMT_START {                            \
     LfHazard *_head;                                                 \
     myhazard->rlist = g_slist_prepend(myhazard->rlist, (p));         \
@@ -140,10 +142,13 @@ lf_hazard_thread_acquire(void)
 	 * Try to reclaim an existing, unused LfHazard structure.
 	 */
 	for (hazard = _lf_hazards; hazard; hazard = hazard->next) {
-		if (hazard->active)
-			continue;
+	  // XXX: Why is this first if needed?  Seems redundant.
+	  //	if (hazard->active)
+	  //		continue;
 		if (!g_atomic_int_compare_and_exchange(&hazard->active, FALSE, TRUE))
 			continue;
+		// Why no destructor function here?  Why rely on programmers to
+		// clean this up?
 		g_static_private_set(&_lf_myhazard, hazard, NULL);
 		return;
 	}
@@ -151,6 +156,9 @@ lf_hazard_thread_acquire(void)
 	/*
 	 * No LfHazard could be reused.  We will create one and push it onto
 	 * the head of the linked-list.
+	 * XXX: Why create only one?  It maybe more efficient with the slice
+	 *      allocater to create a few in order reduce wasted space and
+	 *      avoid allocation delays in the near future.
 	 */
 	old_count = g_atomic_int_exchange_and_add(&_LF_H, LF_HAZARD_K);
 	hazard = g_slice_new0(LfHazard);
@@ -250,8 +258,9 @@ lf_hazard_help_scan(void)
 	LF_HAZARD_INIT;
 
 	for (hazard = _lf_hazards; hazard; hazard = hazard->next) {
-		if (hazard->active)
-			continue;
+	  // XXX: See comment above about this being redundant.
+	  //	if (hazard->active)
+	  //		continue;
 		if (!g_atomic_int_compare_and_exchange(&hazard->active, FALSE, TRUE))
 			continue;
 		while (hazard->rcount > 0) {
